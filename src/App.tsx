@@ -144,7 +144,27 @@ export default function App() {
 function RecognitionPage({ onSave }: { onSave: (record: WrongQuestionRecord) => void }) {
   const [image, setImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('正在智能识别题目内容...');
   const [step, setStep] = useState<'upload' | 'edit' | 'generate'>('upload');
+
+  const processingMessages = [
+    '正在智能识别题目内容...',
+    '正在分析几何结构与顶点...',
+    '正在提取核心知识点...',
+    '即将完成，请稍候...'
+  ];
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isProcessing) {
+      let i = 0;
+      interval = setInterval(() => {
+        i = (i + 1) % processingMessages.length;
+        setProcessingMessage(processingMessages[i]);
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing]);
   
   const [originalQuestion, setOriginalQuestion] = useState('');
   const [originalSvg, setOriginalSvg] = useState<string | undefined>(undefined);
@@ -179,18 +199,22 @@ function RecognitionPage({ onSave }: { onSave: (record: WrongQuestionRecord) => 
         contents: [
           {
             parts: [
-              { text: `你是一位顶尖的数学几何专家。请精准识别图片中的几何图形及其题目内容。
+              { text: `你是一位顶尖的数学几何专家和高级OCR工程师。请精准识别图片中的几何图形及其题目内容。
               
-              识别要求：
-              1. **顶点与标注**：识别图中所有的字母标注（如 A, B, C, D, E, F 等），并确定它们在图形中的精确位置。
-              2. **线段连接**：仔细分析哪些点之间有连线（例如：AB, BC, CD, DA 是外框，AC, BD 是对角线，AE, CF 是内部连线等）。
-              3. **忽略干扰**：彻底忽略任何手写的辅助线、草稿或非印刷体标注。
-              4. **SVG 重构**：生成一段高质量的 SVG 代码（viewBox='0 0 200 200'）。
-                 - 使用黑色线条（stroke="black", stroke-width="1"）。
-                 - 必须在每个顶点附近添加 <text> 标签标注对应的字母。
-                 - 确保图形的比例和拓扑连接与原图完全一致。
+              识别与重构任务：
+              1. **深度几何分析**：
+                 - 识别图中所有的顶点标注（如 A, B, C, D, E, F 等）。
+                 - 建立点与点之间的拓扑连接关系（哪些点构成了线段、多边形、圆等）。
+                 - 识别特殊的几何关系：平行、垂直、中点、切线、角平分线等。
+              2. **严格过滤非印刷元素**：
+                 - 自动识别并彻底忽略图中手写的辅助线、草稿、涂改或任何非原始印刷体的标注。
+              3. **高精度 SVG 重构**：
+                 - 生成一段标准的 SVG 代码（viewBox='0 0 200 200'）。
+                 - 使用黑色线条（stroke="black", stroke-width="1.5"），背景透明（fill="none"）。
+                 - **标注对齐**：在每个顶点附近添加 <text> 标签，标注对应的字母。标注位置应根据图形结构智能调整（如在顶点外侧），避免与线段重叠。
+                 - **比例协调**：确保生成的 SVG 图形比例与原图视觉效果高度一致。
               
-              请以 JSON 格式返回：{ "question": "题目文本", "knowledgePoint": "知识点", "originalSvg": "SVG代码" }` },
+              请以 JSON 格式返回：{ "question": "完整的题目文本", "knowledgePoint": "核心知识点", "originalSvg": "生成的SVG代码" }` },
               { inlineData: { data: imageData, mimeType: "image/jpeg" } }
             ]
           }
@@ -227,21 +251,21 @@ function RecognitionPage({ onSave }: { onSave: (record: WrongQuestionRecord) => 
     setIsGenerating(true);
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: `基于以下错题及其知识点，生成3道相似的“举一反三”题目。
+        model: "gemini-3-flash-preview",
+        contents: `基于以下错题及其知识点，生成3道高质量的“举一反三”变式题目。
         原题: ${originalQuestion}
         知识点: ${knowledgePoint}
         
-        要求:
-        1. 覆盖同一知识点的不同角度或变式。
-        2. 难度与原题相当或略有梯度。
-        3. 每道题附带正确答案。
-        4. 每道题附带解析，解析需侧重易错点分析。
-        5. 如果题目涉及几何图形，请务必为每道题生成一段对应的 SVG 代码（viewBox='0 0 200 200'，黑色线条）来展示图形。
+        生成要求：
+        1. **变式设计**：覆盖同一知识点的不同应用场景，难度与原题相当或呈阶梯式上升。
+        2. **图形重构**：如果题目涉及几何图形，必须为每道题生成一段精确的 SVG 代码（viewBox='0 0 200 200'）。
+           - 使用黑色线条（stroke="black", stroke-width="1.5"），背景透明。
+           - **必须包含顶点标注**（如 A, B, C 等），且标注位置应合理避开线段。
+           - 图形结构必须与题目描述严格匹配。
+        3. **完整内容**：每道题需包含题目内容、标准答案、以及侧重易错点分析的深度解析。
         
-        请以JSON数组格式返回，每个对象包含: 'content', 'answer', 'analysis', 'svg' (可选)。`,
+        请以 JSON 数组格式返回，每个对象包含: 'content', 'answer', 'analysis', 'svg' (涉及图形时必填)。`,
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.ARRAY,
@@ -251,7 +275,7 @@ function RecognitionPage({ onSave }: { onSave: (record: WrongQuestionRecord) => 
                 content: { type: Type.STRING },
                 answer: { type: Type.STRING },
                 analysis: { type: Type.STRING },
-                svg: { type: Type.STRING, description: "SVG code for the figure" }
+                svg: { type: Type.STRING }
               },
               required: ["content", "answer", "analysis"]
             }
@@ -321,7 +345,7 @@ function RecognitionPage({ onSave }: { onSave: (record: WrongQuestionRecord) => 
           {isProcessing && (
             <div className="mt-8 flex flex-col items-center gap-3">
               <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-              <p className="text-slate-500 font-medium">正在智能识别题目内容...</p>
+              <p className="text-slate-500 font-medium">{processingMessage}</p>
             </div>
           )}
         </div>
