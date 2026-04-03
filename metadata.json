@@ -1,0 +1,7 @@
+{
+  "name": "错题举一反三打印机",
+  "description": "一款全科通用的错题学习工具，支持拍照识别错题，智能生成举一反三题目，并提供历史错题本与 PDF 打印功能。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
